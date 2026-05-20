@@ -4,7 +4,8 @@ document.addEventListener('DOMContentLoaded', () => {
     Chart.defaults.font.family = "'Plus Jakarta Sans', sans-serif";
 
     // --- DATA SUMBER (Status SUCCESS sahaja, data anonim secara visual) ---
-    const rawData = [
+    // kept as a local sample fallback; will be replaced when live sheet loads
+    let rawData = [
         { timestamp: "2026-05-06 07:34:54", amaun: 10, tabung: "pembangunan" },
         { timestamp: "2026-05-08 06:09:11", amaun: 5, tabung: "jumaat" },
         { timestamp: "2026-05-08 06:13:44", amaun: 5, tabung: "jumaat" },
@@ -24,6 +25,110 @@ document.addEventListener('DOMContentLoaded', () => {
         { timestamp: "2026-05-19 13:11:28", amaun: 1, tabung: "pembangunan" },
         { timestamp: "2026-05-19 13:30:56", amaun: 1, tabung: "pembangunan" }
     ];
+
+    // --- Google Sheets live loader ---
+    async function parseCsv(text) {
+        const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+        if (!lines.length) return [];
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        const rows = lines.slice(1).map(line => {
+            // simple CSV split (doesn't handle embedded commas/quotes fully)
+            const cols = line.split(',').map(c => c.trim().replace(/^\"|\"$/g, ''));
+            const obj = {};
+            headers.forEach((h, i) => obj[h] = cols[i] || '');
+            return obj;
+        });
+        return rows;
+    }
+
+    function parseGvizJson(text) {
+        // strip wrapper: google.visualization.Query.setResponse(...)
+        const start = text.indexOf('(');
+        const end = text.lastIndexOf(')');
+        if (start === -1 || end === -1) return [];
+        const jsonText = text.slice(start + 1, end);
+        const data = JSON.parse(jsonText);
+        const cols = data.table.cols.map(c => (c.label || c.id || '').toLowerCase());
+        const rows = data.table.rows.map(r => {
+            const obj = {};
+            r.c.forEach((cell, i) => obj[cols[i]] = cell && (cell.v !== undefined ? cell.v : '') );
+            return obj;
+        });
+        return rows;
+    }
+
+    async function fetchSheetData(sheetId, opts = {}) {
+        const { apiKey, sheetName, gid } = opts;
+        // 1) Try Sheets API if apiKey provided
+        if (apiKey) {
+            try {
+                const range = sheetName ? encodeURIComponent(sheetName) : 'A:Z';
+                const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}`;
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Sheets API failed');
+                const json = await res.json();
+                const headers = (json.values && json.values[0]) || [];
+                const rows = (json.values || []).slice(1).map(vals => {
+                    const obj = {};
+                    headers.forEach((h, i) => obj[String(h).trim().toLowerCase()] = vals[i]);
+                    return obj;
+                });
+                return rows;
+            } catch (err) {
+                console.warn('Sheets API fetch failed:', err.message);
+            }
+        }
+
+        // 2) Try CSV export (requires sheet to be shared or published)
+        try {
+            let csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+            if (gid) csvUrl += `&gid=${gid}`;
+            const r = await fetch(csvUrl);
+            if (r.ok) {
+                const txt = await r.text();
+                return await parseCsv(txt);
+            }
+        } catch (err) {
+            console.warn('CSV fetch failed:', err.message);
+        }
+
+        // 3) Try GViz JSON endpoint
+        try {
+            let gviz = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
+            if (gid) gviz += `&gid=${gid}`;
+            const r2 = await fetch(gviz);
+            if (r2.ok) {
+                const txt = await r2.text();
+                return parseGvizJson(txt);
+            }
+        } catch (err) {
+            console.warn('GViz fetch failed:', err.message);
+        }
+
+        throw new Error('All sheet fetch attempts failed');
+    }
+
+    async function loadLiveData(sheetId, opts = {}) {
+        try {
+            const rows = await fetchSheetData(sheetId, opts);
+            if (!rows || !rows.length) return;
+            // map rows to expected rawData format: timestamp, amaun, tabung
+            const mapped = rows.map(r => {
+                // try common header names
+                const ts = r.timestamp || r.date || r['tarikh masa'] || r['tarikh'] || r['time'] || '';
+                const amount = r.amaun || r.amount || r['amaun'] || r.value || r['jumlah'] || '0';
+                const fund = (r.tabung || r.fund || r.kategori || r.category || '').toString().toLowerCase().replace(/\s+/g, '_');
+                return { timestamp: String(ts), amaun: Number(String(amount).replace(/[^0-9.-]+/g, '')) || 0, tabung: fund };
+            }).filter(x => x.timestamp);
+            if (mapped.length) {
+                rawData = mapped;
+                console.info('Loaded live sheet rows:', mapped.length);
+                updateDashboard();
+            }
+        } catch (err) {
+            console.error('Failed to load live sheet:', err.message);
+        }
+    }
 
     const formatCurrency = (val) => {
         const num = Number(val) || 0;
@@ -279,6 +384,11 @@ document.addEventListener('DOMContentLoaded', () => {
     createCharts();
     applyTheme(defaultTheme);
     updateDashboard();
+
+    // Try load live data from Google Sheets (public or published). Replace sheetId below.
+    // If your sheet is private, provide an API key and use loadLiveData(sheetId, { apiKey: 'YOUR_KEY' })
+    const liveSheetId = '1_C9_Fnnacb1d20YK23YslvhczuSYbfJJ3PoFGWkrtEo';
+    loadLiveData(liveSheetId).catch(() => {});
 
     // Mobile menu toggle for sidebar
     const menuBtn = document.getElementById('menu-btn');
