@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dashboard Infaq - Solid Compact</title>
+    
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Font Awesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Plus Jakarta Sans -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <aside class="sidebar">
+        <div class="logo-box"><i class="fas fa-chart-line"></i></div>
+        <ul class="months-list">
+            <li>Jan</li><li>Feb</li><li>Mar</li><li>Apr</li>
+            <li class="active">Mei</li>
+            <li>Jun</li><li>Jul</li><li>Ogo</li><li>Sep</li>
+        </ul>
+    </aside>
+
+    <div id="overlay" class="overlay" aria-hidden="true"></div>
+
+    <main class="main-content">
+        
+        <!-- TOP NAVBAR (Kompak) -->
+        <nav class="top-navbar">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <div class="nav-title">
+                    <i class="fas fa-shield-alt" style="color: var(--color-teal);"></i> Portal Infaq
+                    <span>| Masjid Kampung Sungai Lang Baru</span>
+                </div>
+                <button id="menu-btn" class="menu-btn" aria-label="Toggle menu"><i class="fas fa-bars"></i></button>
+            </div>
+            
+            <div class="filter-section" id="filter-buttons">
+                <button class="filter-btn active" data-fund="all">Semua</button>
+                <button class="filter-btn" data-fund="jumaat">Jumaat</button>
+                <button class="filter-btn" data-fund="pembangunan">Pembangunan</button>
+                <button class="filter-btn" data-fund="anak_yatim">Anak Yatim</button>
+                <button class="filter-btn" data-fund="kebajikan">Kebajikan</button>
+            </div>
+
+            <div class="grand-total" id="grand-total-display">RM 0.00</div>
+        </nav>
+
+        <!-- GRID DASHBOARD (100% tinggi baki) -->
+        <div class="dashboard-grid">
+            
+            <!-- Baris Atas: 4 KPI Cards (Tinggi 85px) -->
+            <div class="card kpi-1">
+                <div class="card-title">Jumlah (Tabung Dipilih) <i class="fas fa-wallet" style="color: var(--accent-orange)"></i></div>
+                <div class="card-value" id="kpi-total">RM 0.00</div>
+            </div>
+            <div class="card kpi-2">
+                <div class="card-title">Purata Sumbangan <i class="fas fa-divide"></i></div>
+                <div class="card-value" id="kpi-avg">RM 0.00</div>
+            </div>
+            <div class="card kpi-3">
+                <div class="card-title">Jumlah Transaksi <i class="fas fa-receipt"></i></div>
+                <div class="card-value" id="kpi-count">0</div>
+            </div>
+            <div class="card kpi-4">
+                <div class="card-title">Sumbangan Tertinggi <i class="fas fa-arrow-trend-up" style="color: var(--color-teal)"></i></div>
+                <div class="card-value" id="kpi-max">RM 0.00</div>
+            </div>
+
+            <!-- Baris Bawah: Carta & Jadual (Isi ruang kosong) -->
+            
+            <!-- Carta Trend -->
+            <div class="card chart-main">
+                <div class="card-title">Trend Kutipan Harian <span id="trend-label" style="color: var(--color-teal);">Semua Tabung</span></div>
+                <div class="chart-container">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Carta Pie & Ranking -->
+            <div class="card chart-side">
+                <div class="card-title">Pecahan Tabung</div>
+                <div class="chart-container" style="flex: 0 0 140px; margin-bottom: 10px;">
+                    <canvas id="pieChart"></canvas>
+                </div>
+                <div class="card-title" style="margin-top: 5px; font-size: 0.75rem;">Ranking Tabung</div>
+                <div class="mini-list" id="mini-fund-list">
+                    <!-- Disuntik JS -->
+                </div>
+            </div>
+
+            <!-- Jadual Transaksi (Tanpa Data Peribadi) -->
+            <div class="card table-area">
+                <div class="table-header">
+                    <div class="card-title" style="margin: 0; color: white;">Rekod Transaksi</div>
+                    <div style="font-size: 0.75rem; color: var(--color-teal); font-weight: 600;" id="table-count">0 rekod</div>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Tarikh Masa</th>
+                                <th>Kategori Tabung</th>
+                                <th style="text-align: right;">Amaun (RM)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body">
+                            <!-- Disuntik JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script src="app.js" defer></script>
+</body>
+</html>
