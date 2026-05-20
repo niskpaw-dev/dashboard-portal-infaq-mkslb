@@ -182,6 +182,46 @@ document.addEventListener('DOMContentLoaded', () => {
     const fundColors = { 'jumaat': '#8b5cf6', 'pembangunan': '#f43f5e', 'anak_yatim': '#14b8a6', 'kebajikan': '#f59e0b' };
     const monthsMs = ['Jan','Feb','Mac','Apr','Mei','Jun','Jul','Ogo','Sep','Okt','Nov','Dis'];
 
+    function parseToDate(ts) {
+        if (!ts) return null;
+        if (ts instanceof Date) return ts;
+        let s = String(ts).trim();
+        // handle common 'YYYY-MM-DD HH:MM:SS' by converting to ISO
+        if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/.test(s)) s = s.replace(' ', 'T');
+        let d = new Date(s);
+        if (!isNaN(d.getTime())) return d;
+        // fallback: try split and construct
+        const datePart = s.split(' ')[0];
+        const parts = datePart.split(/[-/]/);
+        if (parts.length >= 3) {
+            // YYYY-MM-DD
+            if (parts[0].length === 4) {
+                d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+                if (!isNaN(d.getTime())) return d;
+            }
+            // DD-MM-YYYY
+            if (parts[2].length === 4) {
+                d = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+                if (!isNaN(d.getTime())) return d;
+            }
+        }
+        return null;
+    }
+
+    function formatTimestamp(ts) {
+        const d = parseToDate(ts);
+        if (!d) {
+            const raw = String(ts || '').trim();
+            const timeOnly = raw.split(' ')[1] || raw.slice(0,5);
+            return { dateStr: '—', timeStr: timeOnly || '' };
+        }
+        const day = d.getDate();
+        const month = monthsMs[d.getMonth()] || 'Mei';
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mm = String(d.getMinutes()).padStart(2, '0');
+        return { dateStr: `${day} ${month}`, timeStr: `${hh}:${mm}` };
+    }
+
     let trendChart, pieChart;
     // polling control
     let pollIntervalMs = 60000; // 60s
@@ -286,9 +326,17 @@ document.addEventListener('DOMContentLoaded', () => {
         filteredData.forEach(r => {
             total += Number(r.amaun) || 0;
             if ((Number(r.amaun) || 0) > max) max = Number(r.amaun) || 0;
-            let [datePart] = r.timestamp.split(' ');
-            let parts = datePart.split('-'); // YYYY-MM-DD
-            let key = `${parts[2]}-${parts[1]}`; // DD-MM
+            const dt = parseToDate(r.timestamp);
+            let key;
+            if (dt) {
+                const dd = String(dt.getDate()).padStart(2, '0');
+                const mm = String(dt.getMonth() + 1).padStart(2, '0');
+                key = `${dd}-${mm}`;
+            } else {
+                const [datePart] = String(r.timestamp || '').split(' ');
+                const parts = datePart.split('-'); // attempt fallback
+                key = parts.length >= 3 ? `${parts[2]}-${parts[1]}` : datePart;
+            }
             dailyMap[key] = (dailyMap[key] || 0) + (Number(r.amaun) || 0);
         });
 
@@ -364,9 +412,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateTrendChart(dailyMap, filteredData) {
         let source = (filteredData && filteredData.length) ? filteredData : rawData;
         let allDays = [...new Set(source.map(r => {
-            const [datePart] = r.timestamp.split(' ');
-            const [y,m,d] = datePart.split('-');
-            return `${d}-${m}`;
+            const dt = parseToDate(r.timestamp);
+            if (dt) {
+                const dd = String(dt.getDate()).padStart(2, '0');
+                const mm = String(dt.getMonth() + 1).padStart(2, '0');
+                return `${dd}-${mm}`;
+            }
+            const [datePart] = String(r.timestamp || '').split(' ');
+            const parts = datePart.split('-');
+            if (parts.length >= 3) return `${parts[2]}-${parts[1]}`;
+            return datePart;
         }))];
 
         allDays.sort((a,b) => {
