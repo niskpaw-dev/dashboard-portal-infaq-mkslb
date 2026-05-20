@@ -57,7 +57,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return rows;
     }
 
+    function setLiveStatus(msg) {
+        try { if (liveStatusEl) liveStatusEl.innerText = msg; } catch (e) {}
+        console.log('[LiveStatus]', msg);
+    }
+
     async function fetchSheetData(sheetId, opts = {}) {
+        setLiveStatus('Mencuba sambungan ke sheet...');
         const { apiKey, sheetName, gid, appsScriptUrl } = opts;
         // If an Apps Script URL is provided, try it first (expects JSON)
         if (appsScriptUrl) {
@@ -139,6 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (mapped.length) {
                 rawData = mapped;
                 console.info('Loaded live sheet rows:', mapped.length);
+                setLiveStatus(`Live: ${mapped.length} baris dimuat (${new Date().toLocaleString()})`);
                 updateDashboard();
             }
         } catch (err) {
@@ -161,6 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const themeToggle = document.getElementById('theme-toggle');
     const exportCsvBtn = document.getElementById('export-csv');
     const printBtn = document.getElementById('print-report');
+    const liveStatusEl = document.getElementById('live-status');
     const themeKey = 'dashboard-theme';
     const defaultTheme = localStorage.getItem(themeKey) || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
 

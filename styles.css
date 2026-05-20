@@ -176,6 +176,17 @@ body {
     font-size: 1.3rem; font-weight: 800; color: var(--text-cyan); letter-spacing: -0.5px;
 }
 
+.live-status {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    background: rgba(255,255,255,0.02);
+    padding: 6px 10px;
+    border-radius: 10px;
+    border: 1px solid var(--border-dark);
+    display: inline-block;
+    margin-left: 10px;
+}
+
 /* GRID DASHBOARD (Penuh Ketinggian yang Tinggal) */
 .dashboard-grid {
     flex-grow: 1;
