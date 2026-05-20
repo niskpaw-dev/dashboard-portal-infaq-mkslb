@@ -58,7 +58,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function fetchSheetData(sheetId, opts = {}) {
-        const { apiKey, sheetName, gid } = opts;
+        const { apiKey, sheetName, gid, appsScriptUrl } = opts;
+        // If an Apps Script URL is provided, try it first (expects JSON)
+        if (appsScriptUrl) {
+            try {
+                const r = await fetch(appsScriptUrl);
+                if (!r.ok) throw new Error('Apps Script fetch failed');
+                const json = await r.json();
+                // Accept array of objects or wrapper { rows: [...] } or { data: [...] }
+                if (Array.isArray(json)) return json;
+                if (json.rows && Array.isArray(json.rows)) return json.rows;
+                if (json.data && Array.isArray(json.data)) return json.data;
+                // fallback: return object as single-row array
+                return [json];
+            } catch (err) {
+                console.warn('Apps Script fetch failed:', err.message);
+            }
+        }
         // 1) Try Sheets API if apiKey provided
         if (apiKey) {
             try {
@@ -388,7 +404,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Try load live data from Google Sheets (public or published). Replace sheetId below.
     // If your sheet is private, provide an API key and use loadLiveData(sheetId, { apiKey: 'YOUR_KEY' })
     const liveSheetId = '1_C9_Fnnacb1d20YK23YslvhczuSYbfJJ3PoFGWkrtEo';
-    loadLiveData(liveSheetId).catch(() => {});
+    const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbwvz9VQzLDFtKT3LFrhJ4HO0m0RgfQ4mjMOQw7h8gpEtivdiyA5R9Z3lLjIK7lA4brh/exec';
+    loadLiveData(liveSheetId, { appsScriptUrl }).catch(() => {});
 
     // Mobile menu toggle for sidebar
     const menuBtn = document.getElementById('menu-btn');
