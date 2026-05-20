@@ -68,17 +68,30 @@ document.addEventListener('DOMContentLoaded', () => {
         // If an Apps Script URL is provided, try it first (expects JSON)
         if (appsScriptUrl) {
             try {
+                setLiveStatus('Memanggil Apps Script...');
                 const r = await fetch(appsScriptUrl);
                 if (!r.ok) throw new Error('Apps Script fetch failed');
-                const json = await r.json();
+                const txt = await r.text();
+                let json;
+                try { json = JSON.parse(txt); }
+                catch (_) {
+                    // try to extract JSON substring if response has prefix/suffix
+                    const idxObj = txt.indexOf('{');
+                    const idxArr = txt.indexOf('[');
+                    let start = Math.min(idxObj === -1 ? Infinity : idxObj, idxArr === -1 ? Infinity : idxArr);
+                    if (start === Infinity) throw new Error('Apps Script returned non-JSON');
+                    const sub = txt.slice(start);
+                    try { json = JSON.parse(sub); }
+                    catch (err) { throw new Error('Apps Script returned non-JSON'); }
+                }
                 // Accept array of objects or wrapper { rows: [...] } or { data: [...] }
                 if (Array.isArray(json)) return json;
                 if (json.rows && Array.isArray(json.rows)) return json.rows;
                 if (json.data && Array.isArray(json.data)) return json.data;
-                // fallback: return object as single-row array
                 return [json];
             } catch (err) {
                 console.warn('Apps Script fetch failed:', err.message);
+                setLiveStatus('Apps Script fetch gagal');
             }
         }
         // 1) Try Sheets API if apiKey provided
@@ -131,6 +144,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function loadLiveData(sheetId, opts = {}) {
+        // remember last used params for polling/refresh
+        lastSheetId = sheetId;
+        lastLoadOpts = opts;
         try {
             const rows = await fetchSheetData(sheetId, opts);
             if (!rows || !rows.length) return;
@@ -147,6 +163,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.info('Loaded live sheet rows:', mapped.length);
                 setLiveStatus(`Live: ${mapped.length} baris dimuat (${new Date().toLocaleString()})`);
                 updateDashboard();
+                // reset polling interval
+                try { if (pollId) clearInterval(pollId); } catch(e){}
+                pollId = setInterval(() => {
+                    if (lastSheetId) loadLiveData(lastSheetId, lastLoadOpts).catch(() => {});
+                }, pollIntervalMs);
             }
         } catch (err) {
             console.error('Failed to load live sheet:', err.message);
@@ -162,6 +183,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const monthsMs = ['Jan','Feb','Mac','Apr','Mei','Jun','Jul','Ogo','Sep','Okt','Nov','Dis'];
 
     let trendChart, pieChart;
+    // polling control
+    let pollIntervalMs = 60000; // 60s
+    let pollId = null;
+    let lastLoadOpts = null;
+    let lastSheetId = null;
     let currentFilter = 'all';
     const trendCtx = document.getElementById('trendChart').getContext('2d');
     const pieCtx = document.getElementById('pieChart').getContext('2d');
@@ -403,6 +429,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (themeToggle) themeToggle.addEventListener('click', toggleTheme);
     if (exportCsvBtn) exportCsvBtn.addEventListener('click', exportCsv);
     if (printBtn) printBtn.addEventListener('click', printReport);
+    const refreshBtn = document.getElementById('refresh-btn');
+    if (refreshBtn) refreshBtn.addEventListener('click', () => {
+        setLiveStatus('Manual refresh...');
+        if (lastSheetId) loadLiveData(lastSheetId, lastLoadOpts).catch(() => {});
+    });
 
     // Run
     createCharts();
