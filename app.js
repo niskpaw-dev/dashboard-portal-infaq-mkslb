@@ -37,6 +37,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentFilter = 'all';
     const trendCtx = document.getElementById('trendChart').getContext('2d');
     const pieCtx = document.getElementById('pieChart').getContext('2d');
+    const themeToggle = document.getElementById('theme-toggle');
+    const exportCsvBtn = document.getElementById('export-csv');
+    const printBtn = document.getElementById('print-report');
+    const themeKey = 'dashboard-theme';
+    const defaultTheme = localStorage.getItem(themeKey) || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
 
     function hexToRgba(hex, alpha = 1) {
         if (!hex) return `rgba(136,136,136,${alpha})`;
@@ -72,6 +77,48 @@ document.addEventListener('DOMContentLoaded', () => {
                 plugins: { legend: { display: false }, tooltip: { backgroundColor: '#111622', callbacks: { label: ctx => ` RM ${formatCurrency(ctx.raw)}` } } }
             }
         });
+    }
+
+    function setThemeIcon(theme) {
+        if (!themeToggle) return;
+        themeToggle.innerHTML = `<i class="fas fa-${theme === 'light' ? 'sun' : 'moon'}"></i>`;
+    }
+
+    function applyTheme(theme) {
+        document.body.classList.toggle('theme-light', theme === 'light');
+        document.body.classList.toggle('theme-dark', theme !== 'light');
+        localStorage.setItem(themeKey, theme);
+        setThemeIcon(theme);
+    }
+
+    function toggleTheme() {
+        applyTheme(document.body.classList.contains('theme-light') ? 'dark' : 'light');
+    }
+
+    function getExportRows() {
+        const rows = currentFilter === 'all' ? rawData : rawData.filter(r => r.tabung === currentFilter);
+        return rows.map(r => ({ timestamp: r.timestamp, tabung: formatLabel(r.tabung), amaun: formatCurrency(r.amaun) }));
+    }
+
+    function exportCsv() {
+        const rows = getExportRows();
+        const header = ['Tarikh Masa', 'Kategori Tabung', 'Amaun (RM)'];
+        const lines = [header.join(',')].concat(rows.map(r => `${r.timestamp},"${r.tabung}",${r.amaun}`));
+        const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        const safeFilter = currentFilter === 'all' ? 'semua' : currentFilter;
+        const dateStr = new Date().toISOString().slice(0,10);
+        link.download = `infaq-${safeFilter}-${dateStr}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
+
+    function printReport() {
+        window.print();
     }
 
     function updateDashboard() {
@@ -224,8 +271,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    if (themeToggle) themeToggle.addEventListener('click', toggleTheme);
+    if (exportCsvBtn) exportCsvBtn.addEventListener('click', exportCsv);
+    if (printBtn) printBtn.addEventListener('click', printReport);
+
     // Run
     createCharts();
+    applyTheme(defaultTheme);
     updateDashboard();
 
     // Mobile menu toggle for sidebar

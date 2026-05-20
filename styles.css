@@ -146,6 +146,32 @@ body {
     background: var(--color-teal); color: #000; border-color: var(--color-teal); font-weight: 700;
 }
 
+.action-buttons {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.top-action {
+    width: 38px;
+    height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-dark);
+    border-radius: 12px;
+    background: transparent;
+    color: var(--text-main);
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+.top-action:hover {
+    background: rgba(255,255,255,0.08);
+    transform: translateY(-1px);
+}
+.top-action i {
+    font-size: 0.95rem;
+}
+
 .grand-total {
     font-size: 1.3rem; font-weight: 800; color: var(--text-cyan); letter-spacing: -0.5px;
 }
@@ -256,4 +282,43 @@ tr:hover td { background: rgba(255,255,255,0.03); }
     .grand-total { width: 100%; text-align: right; }
     .dashboard-grid { gap: 10px; }
     .chart-container { min-height: 180px; }
+}
+
+body.theme-light {
+    --bg-body: #f8fafc;
+    --bg-card: #ffffff;
+    --bg-hover: #e2e8f0;
+    --text-main: #1f2937;
+    --text-muted: #475569;
+    --text-cyan: #0f766e;
+    --accent-orange: #f97316;
+    --color-purple: #7c3aed;
+    --color-teal: #0f766e;
+    --color-rose: #be123c;
+    --color-yellow: #d97706;
+    --border-dark: #cbd5e1;
+}
+
+body.theme-light .card { border-color: rgba(148,163,184,0.25); }
+body.theme-light .sidebar { background: #ffffff; }
+body.theme-light .top-navbar { background: #ffffff; }
+body.theme-light table, body.theme-light th, body.theme-light td { background: transparent; color: var(--text-main); }
+body.theme-light .table-header { border-bottom-color: rgba(148,163,184,0.25); }
+body.theme-light .mini-item { background: #f8fafc; }
+body.theme-light .mini-item.active { background: #e2e8f0; }
+
+@media print {
+    body, .main-content {
+        background: #fff;
+        color: #000;
+    }
+    .sidebar, .menu-btn, .action-buttons, .filter-section, .grand-total, .top-navbar, .mini-list {
+        display: none !important;
+    }
+    .main-content { padding: 0; }
+    .dashboard-grid { display: block; gap: 0; }
+    .card { border: none; box-shadow: none; background: transparent; }
+    .table-wrapper { overflow: visible; }
+    table { min-width: 0; font-size: 0.85rem; }
+    th, td { background: transparent !important; }
 }

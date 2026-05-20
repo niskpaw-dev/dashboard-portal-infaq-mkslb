@@ -1,17 +1,30 @@
 # Dashboard Infaq (Modular)
 
-This is a modularized version of the dashboard.
+A static dashboard built with modular HTML, CSS, and JavaScript.
 
 Files:
 
-- `dashboard.html` — main HTML shell
-- `styles.css` — extracted styles
-- `app.js` — extracted and refactored JavaScript (runs on DOMContentLoaded)
+- `index.html` — production entry point for Vercel and browser hosting
+- `styles.css` — extracted responsive styles with dark/light theme support
+- `app.js` — extracted JavaScript for chart rendering, filters, CSV export, and print
 
-To run: open `dashboard.html` in a browser (double-click or serve from a local static server).
+Features:
+
+- responsive mobile-first dashboard layout
+- trend line and doughnut charts using Chart.js
+- filter by fund/category
+- dark / light theme toggle
+- export visible transactions to CSV
+- print-friendly report view
+
+To run:
+
+1. Open `index.html` in a browser, or
+2. Serve the folder with any static server
 
 Notes:
 
-- Chart.js is loaded via CDN inside `dashboard.html`.
-- `app.js` uses the global `Chart` provided by Chart.js.
-- If you need to integrate with a build system or ES modules, we can refactor `app.js` further.
+- Chart.js is loaded via CDN in `index.html`.
+- `app.js` initializes charts once and updates chart data dynamically.
+- The theme preference is saved in `localStorage`.
+- `dashboard.html` has been removed as a legacy file.
