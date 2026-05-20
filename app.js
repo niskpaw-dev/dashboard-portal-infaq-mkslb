@@ -67,32 +67,50 @@ document.addEventListener('DOMContentLoaded', () => {
         const { apiKey, sheetName, gid, appsScriptUrl } = opts;
         // If an Apps Script URL is provided, try it first (expects JSON)
         if (appsScriptUrl) {
-            try {
-                setLiveStatus('Memanggil Apps Script...');
-                const r = await fetch(appsScriptUrl);
-                if (!r.ok) throw new Error('Apps Script fetch failed');
-                const txt = await r.text();
-                let json;
-                try { json = JSON.parse(txt); }
-                catch (_) {
-                    // try to extract JSON substring if response has prefix/suffix
-                    const idxObj = txt.indexOf('{');
-                    const idxArr = txt.indexOf('[');
-                    let start = Math.min(idxObj === -1 ? Infinity : idxObj, idxArr === -1 ? Infinity : idxArr);
-                    if (start === Infinity) throw new Error('Apps Script returned non-JSON');
-                    const sub = txt.slice(start);
-                    try { json = JSON.parse(sub); }
-                    catch (err) { throw new Error('Apps Script returned non-JSON'); }
+            // Try Apps Script with retries and basic backoff; improve error messages
+            let attempts = 0;
+            const maxAttempts = 3;
+            let lastErr = null;
+            setLiveStatus('Memanggil Apps Script...');
+            while (attempts < maxAttempts) {
+                attempts += 1;
+                try {
+                    const r = await fetch(appsScriptUrl);
+                    if (!r.ok) {
+                        const statusText = `${r.status} ${r.statusText}`;
+                        const txt = await r.text().catch(() => '');
+                        const snippet = (txt || '').slice(0, 200).replace(/\s+/g, ' ');
+                        throw new Error(`HTTP ${statusText}: ${snippet}`);
+                    }
+                    const contentType = (r.headers.get('content-type') || '').toLowerCase();
+                    const txt = await r.text();
+                    let json = null;
+                    // prefer content-type when available
+                    if (contentType.includes('application/json') || txt.trim().startsWith('{') || txt.trim().startsWith('[')) {
+                        json = JSON.parse(txt);
+                    } else {
+                        // try to extract JSON substring if response is wrapped in HTML or other text
+                        const idxObj = txt.indexOf('{');
+                        const idxArr = txt.indexOf('[');
+                        let start = Math.min(idxObj === -1 ? Infinity : idxObj, idxArr === -1 ? Infinity : idxArr);
+                        if (start === Infinity) throw new Error('Apps Script returned non-JSON content (maybe HTML login redirect)');
+                        const sub = txt.slice(start);
+                        json = JSON.parse(sub);
+                    }
+                    // Accept array of objects or wrapper { rows: [...] } or { data: [...] }
+                    if (Array.isArray(json)) return json;
+                    if (json.rows && Array.isArray(json.rows)) return json.rows;
+                    if (json.data && Array.isArray(json.data)) return json.data;
+                    return [json];
+                } catch (err) {
+                    lastErr = err;
+                    console.warn(`Apps Script attempt ${attempts} failed:`, err.message);
+                    setLiveStatus(`Apps Script percubaan ${attempts} gagal`);
+                    if (attempts < maxAttempts) await new Promise(r => setTimeout(r, attempts * 1000));
                 }
-                // Accept array of objects or wrapper { rows: [...] } or { data: [...] }
-                if (Array.isArray(json)) return json;
-                if (json.rows && Array.isArray(json.rows)) return json.rows;
-                if (json.data && Array.isArray(json.data)) return json.data;
-                return [json];
-            } catch (err) {
-                console.warn('Apps Script fetch failed:', err.message);
-                setLiveStatus('Apps Script fetch gagal');
             }
+            console.warn('Apps Script fetch failed:', lastErr && lastErr.message);
+            setLiveStatus('Apps Script fetch gagal selepas percubaan');
         }
         // 1) Try Sheets API if apiKey provided
         if (apiKey) {
@@ -359,12 +377,10 @@ document.addEventListener('DOMContentLoaded', () => {
         tbody.innerHTML = '';
         // Terbalikkan jadual supaya tarikh terkini di atas
         [...filteredData].reverse().forEach(r => {
-            let [datePart, timePart] = r.timestamp.split(' ');
-            let parts = datePart.split('-');
-            let day = Number(parts[2]);
-            let month = monthsMs[Number(parts[1]) - 1] || 'Mei';
-            let dString = `${day} ${month}, <span style="color:#8b95a5">${timePart.slice(0,5)}</span>`;
-            
+            const ts = r.timestamp;
+            const fmt = formatTimestamp(ts);
+            const dString = `${fmt.dateStr}, <span style="color:#8b95a5">${fmt.timeStr}</span>`;
+
             tbody.innerHTML += `
                 <tr>
                     <td style="font-size:0.85rem; font-weight:500;">${dString}</td>
