@@ -35,6 +35,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let trendChart, pieChart;
     let currentFilter = 'all';
+    const trendCtx = document.getElementById('trendChart').getContext('2d');
+    const pieCtx = document.getElementById('pieChart').getContext('2d');
 
     function hexToRgba(hex, alpha = 1) {
         if (!hex) return `rgba(136,136,136,${alpha})`;
@@ -44,6 +46,32 @@ document.addEventListener('DOMContentLoaded', () => {
         const g = (bigint >> 8) & 255;
         const b = bigint & 255;
         return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    function createCharts() {
+        trendChart = new Chart(trendCtx, {
+            type: 'line',
+            data: { labels: [], datasets: [{ data: [], borderColor: '#14b8a6', backgroundColor: 'rgba(20,184,166,0.25)', borderWidth: 2, fill: true, tension: 0.3, pointRadius: 3, pointBackgroundColor: '#14b8a6', pointBorderWidth: 0 }] },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                animation: false,
+                plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, backgroundColor: '#111622', titleColor: '#fff', bodyColor: '#14b8a6' } },
+                scales: {
+                    x: { grid: { display: false }, ticks: { font: {size: 10} } },
+                    y: { border: {display: false}, grid: { color: '#222a3f' }, ticks: { maxTicksLimit: 5, font: {size: 10} } }
+                }
+            }
+        });
+
+        pieChart = new Chart(pieCtx, {
+            type: 'doughnut',
+            data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderWidth: 0, hoverOffset: 4 }] },
+            options: {
+                responsive: true, maintainAspectRatio: false, cutout: '70%',
+                animation: false,
+                plugins: { legend: { display: false }, tooltip: { backgroundColor: '#111622', callbacks: { label: ctx => ` RM ${formatCurrency(ctx.raw)}` } } }
+            }
+        });
     }
 
     function updateDashboard() {
@@ -132,78 +160,58 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateTrendChart(dailyMap, filteredData) {
-        // Use days present in filteredData for labels, fallback to rawData if empty
         let source = (filteredData && filteredData.length) ? filteredData : rawData;
         let allDays = [...new Set(source.map(r => {
             const [datePart] = r.timestamp.split(' ');
             const [y,m,d] = datePart.split('-');
-            return `${d}-${m}`; // DD-MM
+            return `${d}-${m}`;
         }))];
 
-        // sort by month, then day
         allDays.sort((a,b) => {
             const [da,ma] = a.split('-').map(Number);
             const [db,mb] = b.split('-').map(Number);
-            if (ma === mb) return da - db; return ma - mb;
+            if (ma === mb) return da - db;
+            return ma - mb;
         });
 
-        let labels = allDays.map(key => {
+        const labels = allDays.map(key => {
             const [d,m] = key.split('-').map(Number);
             const month = monthsMs[m - 1] || 'Mei';
             return `${d} ${month}`;
         });
+        const data = allDays.map(d => dailyMap[d] || 0);
+        const cLine = currentFilter === 'all' ? '#14b8a6' : (fundColors[currentFilter] || '#14b8a6');
 
-        let data = allDays.map(d => dailyMap[d] || 0);
-
-        let cLine = currentFilter === 'all' ? '#14b8a6' : (fundColors[currentFilter] || '#14b8a6');
-        let ctx = document.getElementById('trendChart').getContext('2d');
-        let grad = ctx.createLinearGradient(0, 0, 0, 200);
+        const grad = trendCtx.createLinearGradient(0, 0, 0, 200);
         grad.addColorStop(0, hexToRgba(cLine, 0.25));
         grad.addColorStop(1, hexToRgba(cLine, 0));
 
-        if(trendChart) trendChart.destroy();
-        trendChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: data, borderColor: cLine, backgroundColor: grad, borderWidth: 2, fill: true,
-                    tension: 0.3, pointRadius: 3, pointBackgroundColor: cLine, pointBorderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, backgroundColor: '#111622', titleColor: '#fff', bodyColor: cLine } },
-                scales: {
-                    x: { grid: { display: false }, ticks: { font: {size: 10} } },
-                    y: { border: {display: false}, grid: { color: '#222a3f' }, ticks: { maxTicksLimit: 5, font: {size: 10} } }
-                }
-            }
-        });
+        if (trendChart) {
+            trendChart.data.labels = labels;
+            trendChart.data.datasets[0].data = data;
+            trendChart.data.datasets[0].borderColor = cLine;
+            trendChart.data.datasets[0].backgroundColor = grad;
+            trendChart.data.datasets[0].pointBackgroundColor = cLine;
+            trendChart.options.plugins.tooltip.bodyColor = cLine;
+            trendChart.update({ duration: 0 });
+        }
     }
 
     function updatePieChart(fundMap) {
-        let keys = Object.keys(fundMap);
-        let labels = keys.map(formatLabel);
-        let data = Object.values(fundMap);
-        
-        let colors = keys.map(k => {
-            let base = fundColors[k] || '#888888';
+        const keys = Object.keys(fundMap);
+        const labels = keys.map(formatLabel);
+        const data = Object.values(fundMap);
+        const colors = keys.map(k => {
+            const base = fundColors[k] || '#888888';
             return (currentFilter === 'all' || currentFilter === k) ? base : hexToRgba(base, 0.2);
         });
 
-        if(pieChart) pieChart.destroy();
-        pieChart = new Chart(document.getElementById('pieChart').getContext('2d'), {
-            type: 'doughnut',
-            data: { labels: labels, datasets: [{ data: data, backgroundColor: colors, borderWidth: 0, hoverOffset: 4 }] },
-            options: {
-                responsive: true, maintainAspectRatio: false, cutout: '70%',
-                plugins: {
-                    legend: { display: false }, // Disembunyikan, guna ranking di bawah
-                    tooltip: { backgroundColor: '#111622', callbacks: { label: ctx => ` RM ${formatCurrency(ctx.raw)}` } }
-                }
-            }
-        });
+        if (pieChart) {
+            pieChart.data.labels = labels;
+            pieChart.data.datasets[0].data = data;
+            pieChart.data.datasets[0].backgroundColor = colors;
+            pieChart.update({ duration: 0 });
+        }
     }
 
     // Events Filter
@@ -217,6 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Run
+    createCharts();
     updateDashboard();
 
     // Mobile menu toggle for sidebar
